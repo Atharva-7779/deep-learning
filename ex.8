@@ -1,0 +1,91 @@
+rom keras.datasets import mnist
+from keras.layers import Input, Dense
+from keras.models import Model
+import numpy as np
+import matplotlib.pyplot as plt
+
+# For Jupyter/Colab
+%matplotlib inline
+
+# -----------------------------
+# Step 1: Load Data
+# -----------------------------
+(X_train, _), (X_test, _) = mnist.load_data()
+
+# Normalize
+X_train = X_train.astype('float32') / 255
+X_test = X_test.astype('float32') / 255
+
+# Flatten images (28x28 → 784)
+X_train = X_train.reshape(len(X_train), 784)
+X_test = X_test.reshape(len(X_test), 784)
+
+print("Train shape:", X_train.shape)
+print("Test shape:", X_test.shape)
+
+# -----------------------------
+# Step 2: Build Autoencoder
+# -----------------------------
+input_img = Input(shape=(784,))
+
+# Encoder
+encoded = Dense(32, activation='relu')(input_img)
+
+# Decoder
+decoded = Dense(784, activation='sigmoid')(encoded)
+
+# Models
+autoencoder = Model(input_img, decoded)
+encoder = Model(input_img, encoded)
+
+# -----------------------------
+# Step 3: Compile
+# -----------------------------
+autoencoder.compile(
+    optimizer='adam',   # changed from adadelta (better performance)
+    loss='binary_crossentropy',
+    metrics=['accuracy']
+)
+
+# -----------------------------
+# Step 4: Train
+# -----------------------------
+autoencoder.fit(
+    X_train, X_train,
+    epochs=50,
+    batch_size=256,
+    shuffle=True,
+    validation_data=(X_test, X_test)
+)
+
+# -----------------------------
+# Step 5: Predict
+# -----------------------------
+encoded_imgs = encoder.predict(X_test)
+decoded_imgs = autoencoder.predict(X_test)
+
+# -----------------------------
+# Step 6: Visualization
+# -----------------------------
+plt.figure(figsize=(20, 6))
+
+for i in range(10):
+    # Original
+    ax = plt.subplot(3, 10, i + 1)
+    plt.imshow(X_test[i].reshape(28, 28))
+    plt.gray()
+    ax.axis('off')
+
+    # Encoded (compressed)
+    ax = plt.subplot(3, 10, i + 11)
+    plt.imshow(encoded_imgs[i].reshape(8, 4))  # 32 → 8x4
+    plt.gray()
+    ax.axis('off')
+
+    # Reconstructed
+    ax = plt.subplot(3, 10, i + 21)
+    plt.imshow(decoded_imgs[i].reshape(28, 28))
+    plt.gray()
+    ax.axis('off')
+
+plt.show()
