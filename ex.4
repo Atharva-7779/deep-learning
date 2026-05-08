@@ -1,0 +1,181 @@
+!pip install mtcnn
+!pip install opencv-python
+
+from google.colab import drive
+drive.mount('/content/drive')
+
+import matplotlib.pyplot as plt
+from mtcnn.mtcnn import MTCNN
+from PIL import Image
+from numpy import asarray
+import cv2
+import glob
+
+def draw_faces(filename, result_list):
+    data = plt.imread(filename)
+
+    plt.figure(figsize=(2,2))
+
+    for i in range(len(result_list)):
+        x1, y1, width, height = result_list[i]['box']
+        x2, y2 = x1 + width, y1 + height
+
+        if x1 < 0: x1 = 0
+        if y1 < 0: y1 = 0
+        if x2 < 0: x2 = 0
+        if y2 < 0: y2 = 0
+
+        face = data[y1:y2, x1:x2]
+
+        plt.subplot(1, len(result_list), i+1)
+        plt.axis('off')
+        plt.imshow(face)
+
+    plt.show()
+
+path = glob.glob("/content/drive/MyDrive/FaceRecog/*.jpg")
+
+detector = MTCNN()
+
+for img in path:
+    filename = img
+
+    image = Image.open(filename)
+    image = image.convert('RGB')
+    pixels = asarray(image)
+
+    faces = detector.detect_faces(pixels)
+
+    draw_faces(filename, faces)
+
+import pandas as pd
+import os
+
+file_names = os.listdir("/content/drive/MyDrive/FaceRecog")
+
+NameArray = []
+
+for name in file_names:
+    category = name.rsplit('_',1)[0]
+    NameArray.append(category)
+
+train = pd.DataFrame({
+    'filename': file_names,
+    'category': NameArray
+})
+
+train.head()
+
+from sklearn.model_selection import train_test_split
+
+train_df, validate_df = train_test_split(train, test_size=0.2, random_state=0)
+
+train_df = train_df.reset_index(drop=True)
+validate_df = validate_df.reset_index(drop=True)
+
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+
+training = ImageDataGenerator(
+    rotation_range=5,
+    rescale=1./255,
+    shear_range=0.1,
+    zoom_range=0.2,
+    horizontal_flip=True,
+    width_shift_range=0.1,
+    height_shift_range=0.1
+)
+
+validation = ImageDataGenerator(rescale=1./255)
+
+classes = sorted(train_df['category'].unique())
+
+trainingdata = training.flow_from_dataframe(
+    train_df,
+    directory="/content/drive/MyDrive/FaceRecog",
+    x_col='filename',
+    y_col='category',
+    target_size=(224,224),
+    class_mode='categorical',
+    classes=classes
+)
+
+validationdata = validation.flow_from_dataframe(
+    validate_df,
+    directory="/content/drive/MyDrive/FaceRecog",
+    x_col='filename',
+    y_col='category',
+    target_size=(224,224),
+    class_mode='categorical',
+    classes=classes
+)
+print(os.listdir("/content/drive/MyDrive/FaceRecog"))
+print("Train samples:", trainingdata.samples)
+print("Validation samples:", validationdata.samples)
+
+from tensorflow.keras.applications.vgg16 import VGG16
+from tensorflow.keras import models,layers
+
+base = VGG16(weights='imagenet', include_top=False, input_shape=(224,224,3))
+
+base.trainable = False
+
+model = models.Sequential()
+
+model.add(base)
+model.add(layers.Flatten())
+model.add(layers.Dense(400, activation='relu'))
+
+num_classes = len(classes)
+model.add(layers.Dense(num_classes, activation='softmax'))
+
+model.compile(
+    optimizer="adam",
+    loss='categorical_crossentropy',
+    metrics=['accuracy']
+)
+
+model.summary()
+
+history = model.fit(
+    trainingdata,
+    validation_data=validationdata,
+    epochs=30
+
+loss, validation_acc = model.evaluate(validationdata)
+
+print("Validation Accuracy:", validation_acc)
+
+import matplotlib.pyplot as plt
+
+plt.plot(history.history['accuracy'])
+plt.plot(history.history['val_accuracy'])
+
+plt.title("Model Accuracy")
+plt.ylabel("Accuracy")
+plt.xlabel("Epoch")
+
+plt.legend(['Train','Validation'])
+
+plt.show()
+
+from sklearn.decomposition import PCA
+import numpy as np
+
+images = []
+
+for file in file_names:
+    img = cv2.imread("/content/drive/MyDrive/FaceRecog/" + file)
+    img = cv2.resize(img,(64,64))
+    images.append(img.flatten())
+
+X = np.array(images)
+
+n_samples, n_features = X.shape
+n_components = min(n_samples, n_features)
+
+pca = PCA(n_components=n_components)
+
+X_reduced = pca.fit_transform(X)
+
+print("Original Shape:", X.shape)
+print("Reduced Shape:", X_reduced.shape)
