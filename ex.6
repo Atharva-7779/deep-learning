@@ -1,0 +1,50 @@
+from PIL import ImageFile
+ImageFile.LOAD_TRUNCATED_IMAGES = True
+
+import tensorflow as tf
+from tensorflow.keras import models, layers
+from tensorflow.keras.applications import VGG16
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+
+# Path
+path = "/content/train"
+
+# Image Generator (NO validation split = no error)
+train_gen = ImageDataGenerator(rescale=1./255)
+
+# Load data
+trainingdata = train_gen.flow_from_directory(
+    path,
+    target_size=(224,224),
+    batch_size=4,
+    class_mode='categorical'
+)
+
+# Model (VGG16)
+base = VGG16(include_top=False, input_shape=(224,224,3), weights='imagenet')
+base.trainable = False
+
+model = models.Sequential([
+    base,
+    layers.Flatten(),
+    layers.Dense(120, activation="relu"),
+    layers.Dense(2, activation="softmax")
+])
+
+model.compile(
+    optimizer="adam",
+    loss='categorical_crossentropy',
+    metrics=['accuracy']
+)
+
+model.summary()
+
+# Training (NO validation → NO error)
+history = model.fit(
+    trainingdata,
+    epochs=10
+)
+
+# Evaluate on same data (basic check)
+loss, acc = model.evaluate(trainingdata)
+print("Accuracy:", acc)
