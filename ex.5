@@ -1,0 +1,72 @@
+import tensorflow as tf
+from tensorflow.keras import layers, models, datasets
+from tensorflow.keras.applications import VGG16
+
+# Load dataset
+(train_images, train_labels), (test_images, test_labels) = datasets.cifar100.load_data()
+
+# Normalize
+train_images = train_images / 255.0
+test_images = test_images / 255.0
+
+# Load VGG16 base model
+base = VGG16(include_top=False, weights='imagenet', input_shape=(32, 32, 3))
+base.trainable = False
+
+# Build model
+model = models.Sequential()
+model.add(base)  # IMPORTANT (missing in your code)
+model.add(layers.Flatten())
+model.add(layers.Dense(512, activation="relu"))
+model.add(layers.Dense(100, activation="softmax"))
+
+# ------------------ ADAM ------------------
+model.compile(optimizer="adam",
+              loss="sparse_categorical_crossentropy",
+              metrics=["accuracy"])
+
+print("\nTraining with ADAM\n")
+model.fit(train_images, train_labels,
+          epochs=5,
+          validation_data=(test_images, test_labels))
+
+# ------------------ SGD ------------------
+model.compile(optimizer="sgd",
+              loss="sparse_categorical_crossentropy",
+              metrics=["accuracy"])
+
+print("\nTraining with SGD\n")
+model.fit(train_images, train_labels,
+          epochs=5,
+          validation_data=(test_images, test_labels))
+
+# ------------------ Adagrad ------------------
+model.compile(optimizer="adagrad",
+              loss="sparse_categorical_crossentropy",
+              metrics=["accuracy"])
+
+print("\nTraining with Adagrad\n")
+model.fit(train_images, train_labels,
+          epochs=5,
+          validation_data=(test_images, test_labels))
+
+# ------------------ RMSprop ------------------
+model.compile(optimizer="rmsprop",
+              loss="sparse_categorical_crossentropy",
+              metrics=["accuracy"])
+
+print("\nTraining with RMSprop\n")
+model.fit(train_images, train_labels,
+          epochs=5,
+          validation_data=(test_images, test_labels))
+
+# ------------------ Nadam ------------------
+model.compile(optimizer="nadam",
+              loss="sparse_categorical_crossentropy",
+              metrics=["accuracy"])
+
+print("\nTraining with Nadam\n")
+model.fit(train_images, train_labels,
+          epochs=5,
+          validation_data=(test_images, test_labels))
+
